@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+service MarketData {
+  rpc Subscribe(stream SubscribeRequest) returns (stream OrderBookUpdate);
+}
+
+message SubscribeRequest {
+  string instrument_id = 1;
+}
+
+message OrderBookSnapshot {
+  string instrument_id = 1;
+  repeated float bids = 2;
+  repeated float asks = 3;
+}
+
+message OrderBookUpdate {
+  string instrument_id = 1;
+  repeated float updated_bids = 2;
+  repeated float updated_asks = 3;
+  string update_type = 4; // e.g., "partial", "cancel", etc.
+}
