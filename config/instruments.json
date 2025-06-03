@@ -1,0 +1,13 @@
+{
+    "instruments": [
+      {
+        "instrument_id": "ES",
+        "order_book_depth": 5
+      },
+      {
+        "instrument_id": "AAPL",
+        "order_book_depth": 10
+      }
+    ]
+  }
+  
