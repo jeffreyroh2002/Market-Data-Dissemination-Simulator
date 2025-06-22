@@ -1,7 +1,7 @@
 # server/order_book_manager.py
 
-from order_book import OrderBook
-from config_loader import load_config
+from server.order_book import OrderBook
+from server.config_loader import load_config
 
 class OrderBookManager:
     def __init__(self, config_path):
