@@ -6,17 +6,13 @@ service MarketData {
 
 message SubscribeRequest {
   string instrument_id = 1;
-}
-
-message OrderBookSnapshot {
-  string instrument_id = 1;
-  repeated float bids = 2;
-  repeated float asks = 3;
+  uint64 last_seq      = 2;   // 0 (or unset) = ask for snapshot
 }
 
 message OrderBookUpdate {
-  string instrument_id = 1;
-  repeated float updated_bids = 2;
-  repeated float updated_asks = 3;
-  string update_type = 4; // e.g., "partial", "cancel", etc.
+  uint64 seq_no        = 1;
+  string instrument_id = 2;
+  repeated float updated_bids = 3;
+  repeated float updated_asks = 4;
+  string  update_type  = 5;   // snapshot / modify / cancel / partial
 }

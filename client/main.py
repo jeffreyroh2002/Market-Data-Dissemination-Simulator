@@ -1,42 +1,43 @@
 """
-client/main.py
-Subscribe to two instruments (ES, AAPL) and print live book updates.
+Client that subscribes to ES and AAPL,
+tracks last seq_no, reconnects if connection drops.
 Run with:  python -m client.main
 """
 
+import time
 import grpc
-import market_data_pb2
-import market_data_pb2_grpc
+import market_data_pb2 as pb
+import market_data_pb2_grpc as pb_grpc
+
+INSTRUMENTS = ["ES", "AAPL"]
 
 
-def run() -> None:
+def connect(last_seq_map: dict[str, int]):
     channel = grpc.insecure_channel("localhost:50051")
+    stub = pb_grpc.MarketDataStub(channel)
 
-    # Wait until channel ready (optional safety)
-    try:
-        grpc.channel_ready_future(channel).result(timeout=5)
-        print("✅ connected to server")
-    except grpc.FutureTimeoutError:
-        print("❌ server not reachable")
-        return
-
-    stub = market_data_pb2_grpc.MarketDataStub(channel)
-
-    # ── the generator that sends multiple SubscribeRequest messages ──
     def gen():
-        yield market_data_pb2.SubscribeRequest(instrument_id="ES")
-        yield market_data_pb2.SubscribeRequest(instrument_id="AAPL")
-        # you could keep yielding more SubscribeRequest objects later
-        # (e.g. driven by user input) if you want dynamic subscriptions
+        for ins in INSTRUMENTS:
+            last = last_seq_map.get(ins, 0)
+            yield pb.SubscribeRequest(instrument_id=ins, last_seq=last)
 
-    # receive snapshot + incremental updates for every subscribed instrument
-    for upd in stub.Subscribe(gen()):
-        print(
-            f"\n{upd.update_type.upper():<11} {upd.instrument_id}\n"
-            f"Bids: {upd.updated_bids}\n"
-            f"Asks: {upd.updated_asks}"
-        )
+    return stub.Subscribe(gen())
+
+
+def main():
+    last_seq: dict[str, int] = {}
+    while True:
+        try:
+            for upd in connect(last_seq):
+                last_seq[upd.instrument_id] = upd.seq_no
+                print(
+                    f"{upd.update_type:<10} {upd.instrument_id}  "
+                    f"seq={upd.seq_no}  bid0={upd.updated_bids[0]:.2f}"
+                )
+        except grpc.RpcError as e:
+            print(f"stream error ({e.code()}) – reconnecting in 1 s")
+            time.sleep(1)
 
 
 if __name__ == "__main__":
-    run()
+    main()
