@@ -14,5 +14,6 @@ message OrderBookUpdate {
   string instrument_id = 2;
   repeated float updated_bids = 3;
   repeated float updated_asks = 4;
-  string  update_type  = 5;   // snapshot / modify / cancel / partial
+  string  update_type  = 5;
+  uint64  send_ts_ns   = 6;   // NEW – server clock nanos since epoch
 }

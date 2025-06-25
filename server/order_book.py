@@ -1,71 +1,57 @@
+import random
+import itertools
 from dataclasses import dataclass
-import random, itertools
 
 @dataclass
 class BookLevel:
     price: float
-    size: int     # 0 => empty
+    size: int
 
 class OrderBook:
-    _seq = itertools.count()          # global monotonic sequence
+    _seq = itertools.count()
 
-    def __init__(self, instrument_id: str, depth: int):
+    def __init__(self, instrument_id, depth):
         self.instrument_id = instrument_id
         self.depth = depth
-        self.bids: list[BookLevel] = []
-        self.asks: list[BookLevel] = []
-        self._init_book()
+        self.bids = [BookLevel(price=100 - i * 0.1, size=10) for i in range(depth)]
+        self.asks = [BookLevel(price=100 + i * 0.1, size=10) for i in range(depth)]
 
-    def _init_book(self) -> None:
-        mid = 100.0
-        spread = 0.5
-        for i in range(self.depth):
-            self.bids.append(BookLevel(mid - spread - i*0.1, random.randint(5,15)))
-            self.asks.append(BookLevel(mid + spread + i*0.1, random.randint(5,15)))
-
-    # ──────────────────────────────────────────────────────────────
     def snapshot_prices(self):
-        """Return only price lists (sizes optional for v-1)."""
         return ([lvl.price for lvl in self.bids],
                 [lvl.price for lvl in self.asks])
 
-    # simple wrapper so existing code continues to work
     def get_snapshot(self):
         return self.snapshot_prices()
 
     def generate_update(self):
-        """Produce one random micro-event and return new price lists."""
-        side = random.choice(["bid","ask"])
-        book = self.bids if side=="bid" else self.asks
-        lvl   = random.randint(0, self.depth-1)
+        side = random.choice(["bid", "ask"])
+        book = self.bids if side == "bid" else self.asks
+        idx = random.randint(0, self.depth - 1)
+
         event = random.choices(
-            ["modify", "cancel", "partial"],
-            weights=[0.5, 0.25, 0.25]
+            ["modify", "partial", "cancel"],
+            weights=[0.5, 0.3, 0.2]
         )[0]
 
-        level = book[lvl]
-
         if event == "modify":
-            level.price = round(level.price + random.uniform(-0.05,0.05), 2)
-
-        elif event == "cancel":
-            level.size = 0                # mark empty
+            delta = random.uniform(-0.02, 0.02)
+            book[idx].price += delta
 
         elif event == "partial":
-            if level.size <= 1:
-                # size 1 (or 0)  ⇒ treat as full cancel
-                level.size = 0
-                event = "cancel"
-            else:
-                fill = random.randint(1, level.size - 1)   # leave at least 1
-                level.size -= fill
+            reduction = random.randint(1, max(1, book[idx].size // 2))
+            book[idx].size -= reduction
+            if book[idx].size <= 0:
+                book.pop(idx)
+                book.append(BookLevel(price=book[-1].price - 0.1 if side == "bid" else book[-1].price + 0.1, size=10))
 
-        # prune cancels (size==0) then pad depth
-        if level.size == 0:
-            del book[lvl]
-            pad_price = (book[0].price - 0.01) if side=="bid" else (book[-1].price + 0.01)
-            book.append(BookLevel(pad_price, 0))
+        elif event == "cancel":
+            book.pop(idx)
+            book.append(BookLevel(price=book[-1].price - 0.1 if side == "bid" else book[-1].price + 0.1, size=10))
 
-        seq_no = next(OrderBook._seq)
-        bids, asks = self.snapshot_prices()
-        return seq_no, bids, asks, event
+        seq = next(OrderBook._seq)
+        return {
+            "seq": seq,
+            "bids": [lvl.price for lvl in self.bids],
+            "asks": [lvl.price for lvl in self.asks],
+            "type": event
+        }
